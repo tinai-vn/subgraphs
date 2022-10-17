@@ -3,13 +3,9 @@ import {
   Token,
   UsageMetricsDailySnapshot,
   FinancialsDailySnapshot,
-  MarketDailySnapshot,
   LendingProtocol,
   Market,
   _Ilk,
-  InterestRate,
-  MarketHourlySnapshot,
-  UsageMetricsHourlySnapshot,
   Liquidate,
   _Chi,
   _Urn,
@@ -18,17 +14,13 @@ import {
 import {
   BIGINT_ONE,
   BIGDECIMAL_ZERO,
-  ProtocolType,
   SECONDS_PER_DAY,
-  LendingType,
   VAT_ADDRESS,
   ZERO_ADDRESS,
   BIGDECIMAL_ONE,
   DAI_ADDRESS,
   SECONDS_PER_HOUR,
   Network,
-  InterestRateSide,
-  InterestRateType,
   PROTOCOL_SCHEMA_VERSION,
   PROTOCOL_SUBGRAPH_VERSION,
   PROTOCOL_METHODOLOGY_VERSION,
@@ -61,31 +53,6 @@ export function getOrCreateToken(
 ///////// Metrics /////////
 ///////////////////////////
 
-export function getOrCreateUsageMetricsHourlySnapshot(event: ethereum.Event): UsageMetricsHourlySnapshot {
-  // Number of days since Unix epoch
-  let id: i64 = event.block.timestamp.toI64() / SECONDS_PER_HOUR;
-
-  // Create unique id for the day
-  let usageMetrics = UsageMetricsHourlySnapshot.load(id.toString());
-  let protocol = getOrCreateLendingProtocol();
-  if (usageMetrics == null) {
-    usageMetrics = new UsageMetricsHourlySnapshot(id.toString());
-    usageMetrics.protocol = protocol.id;
-    usageMetrics.hourlyActiveUsers = 0;
-    usageMetrics.cumulativeUniqueUsers = protocol.cumulativeUniqueUsers;
-    usageMetrics.hourlyTransactionCount = 0;
-    usageMetrics.hourlyDepositCount = 0;
-    usageMetrics.hourlyBorrowCount = 0;
-    usageMetrics.hourlyWithdrawCount = 0;
-    usageMetrics.hourlyRepayCount = 0;
-    usageMetrics.hourlyLiquidateCount = 0;
-    usageMetrics.blockNumber = BIGINT_ZERO;
-    usageMetrics.timestamp = BIGINT_ZERO;
-    usageMetrics.save();
-  }
-  return usageMetrics;
-}
-
 export function getOrCreateUsageMetricsDailySnapshot(event: ethereum.Event): UsageMetricsDailySnapshot {
   // Number of days since Unix epoch
   let id: i64 = event.block.timestamp.toI64() / SECONDS_PER_DAY;
@@ -113,97 +80,6 @@ export function getOrCreateUsageMetricsDailySnapshot(event: ethereum.Event): Usa
   return usageMetrics;
 }
 
-export function getOrCreateMarketHourlySnapshot(event: ethereum.Event, marketAddress: string): MarketHourlySnapshot {
-  let hours: i64 = event.block.timestamp.toI64() / SECONDS_PER_HOUR;
-  let snapshotID = marketAddress.concat("-").concat(hours.toString());
-  let marketMetrics = MarketHourlySnapshot.load(snapshotID);
-  let market = getOrCreateMarket(marketAddress);
-
-  if (marketMetrics == null) {
-    marketMetrics = new MarketHourlySnapshot(snapshotID);
-    marketMetrics.protocol = getOrCreateLendingProtocol().id;
-    marketMetrics.market = marketAddress;
-    marketMetrics.inputTokenBalance = market.inputTokenBalance;
-    marketMetrics.inputTokenPriceUSD = market.inputTokenPriceUSD;
-    marketMetrics.outputTokenSupply = market.outputTokenSupply;
-    marketMetrics.outputTokenPriceUSD = market.outputTokenPriceUSD;
-    marketMetrics.totalValueLockedUSD = market.totalValueLockedUSD;
-    marketMetrics.totalDepositBalanceUSD = market.totalDepositBalanceUSD;
-    marketMetrics.totalBorrowBalanceUSD = market.totalBorrowBalanceUSD;
-
-    marketMetrics.cumulativeDepositUSD = market.cumulativeDepositUSD;
-    marketMetrics.cumulativeBorrowUSD = market.cumulativeBorrowUSD;
-    marketMetrics.cumulativeLiquidateUSD = market.cumulativeLiquidateUSD;
-
-    marketMetrics.rates = market.rates;
-    marketMetrics.blockNumber = event.block.number;
-    marketMetrics.timestamp = event.block.timestamp;
-
-    marketMetrics.hourlyDepositUSD = BIGDECIMAL_ZERO;
-    marketMetrics.hourlyBorrowUSD = BIGDECIMAL_ZERO;
-    marketMetrics.hourlyLiquidateUSD = BIGDECIMAL_ZERO;
-    marketMetrics.hourlyWithdrawUSD = BIGDECIMAL_ZERO;
-    marketMetrics.hourlyRepayUSD = BIGDECIMAL_ZERO;
-
-    marketMetrics.cumulativeSupplySideRevenueUSD = market.cumulativeSupplySideRevenueUSD;
-    marketMetrics.cumulativeProtocolSideRevenueUSD = market.cumulativeProtocolSideRevenueUSD;
-    marketMetrics.cumulativeTotalRevenueUSD = market.cumulativeTotalRevenueUSD;
-
-    marketMetrics.hourlySupplySideRevenueUSD = BIGDECIMAL_ZERO;
-    marketMetrics.hourlyProtocolSideRevenueUSD = BIGDECIMAL_ZERO;
-    marketMetrics.hourlyTotalRevenueUSD = BIGDECIMAL_ZERO;
-
-    marketMetrics.save();
-  }
-
-  return marketMetrics;
-}
-
-export function getOrCreateMarketDailySnapshot(event: ethereum.Event, marketAddress: string): MarketDailySnapshot {
-  let days: i64 = event.block.timestamp.toI64() / SECONDS_PER_DAY;
-  let snapshotID = marketAddress.concat("-").concat(days.toString());
-  let marketMetrics = MarketDailySnapshot.load(snapshotID);
-  let market = getOrCreateMarket(marketAddress);
-
-  if (marketMetrics == null) {
-    marketMetrics = new MarketDailySnapshot(snapshotID);
-    marketMetrics.protocol = getOrCreateLendingProtocol().id;
-    marketMetrics.market = marketAddress;
-    marketMetrics.inputTokenBalance = market.inputTokenBalance;
-    marketMetrics.inputTokenPriceUSD = market.inputTokenPriceUSD;
-    marketMetrics.outputTokenSupply = market.outputTokenSupply;
-    marketMetrics.outputTokenPriceUSD = market.outputTokenPriceUSD;
-    marketMetrics.totalValueLockedUSD = market.totalValueLockedUSD;
-    marketMetrics.totalDepositBalanceUSD = market.totalDepositBalanceUSD;
-    marketMetrics.totalBorrowBalanceUSD = market.totalBorrowBalanceUSD;
-
-    marketMetrics.cumulativeDepositUSD = market.cumulativeDepositUSD;
-    marketMetrics.cumulativeBorrowUSD = market.cumulativeBorrowUSD;
-    marketMetrics.cumulativeLiquidateUSD = market.cumulativeLiquidateUSD;
-
-    marketMetrics.rates = market.rates;
-    marketMetrics.blockNumber = event.block.number;
-    marketMetrics.timestamp = event.block.timestamp;
-
-    marketMetrics.dailyDepositUSD = BIGDECIMAL_ZERO;
-    marketMetrics.dailyBorrowUSD = BIGDECIMAL_ZERO;
-    marketMetrics.dailyLiquidateUSD = BIGDECIMAL_ZERO;
-    marketMetrics.dailyWithdrawUSD = BIGDECIMAL_ZERO;
-    marketMetrics.dailyRepayUSD = BIGDECIMAL_ZERO;
-
-    marketMetrics.cumulativeSupplySideRevenueUSD = market.cumulativeSupplySideRevenueUSD;
-    marketMetrics.cumulativeProtocolSideRevenueUSD = market.cumulativeProtocolSideRevenueUSD;
-    marketMetrics.cumulativeTotalRevenueUSD = market.cumulativeTotalRevenueUSD;
-
-    marketMetrics.dailySupplySideRevenueUSD = BIGDECIMAL_ZERO;
-    marketMetrics.dailyProtocolSideRevenueUSD = BIGDECIMAL_ZERO;
-    marketMetrics.dailyTotalRevenueUSD = BIGDECIMAL_ZERO;
-
-    marketMetrics.save();
-  }
-
-  return marketMetrics;
-}
 
 export function getOrCreateFinancials(event: ethereum.Event): FinancialsDailySnapshot {
   // Number of days since Unix epoch
@@ -263,7 +139,6 @@ export function getOrCreateLendingProtocol(): LendingProtocol {
     protocol.subgraphVersion = PROTOCOL_SUBGRAPH_VERSION;
     protocol.methodologyVersion = PROTOCOL_METHODOLOGY_VERSION;
     protocol.network = Network.MAINNET;
-    protocol.type = ProtocolType.LENDING;
     protocol.cumulativeUniqueUsers = 0;
     protocol.cumulativeSupplySideRevenueUSD = BIGDECIMAL_ZERO;
     protocol.cumulativeProtocolSideRevenueUSD = BIGDECIMAL_ZERO;
@@ -278,7 +153,6 @@ export function getOrCreateLendingProtocol(): LendingProtocol {
     protocol.totalBorrowBalanceUSD = BIGDECIMAL_ZERO;
     protocol.totalPoolCount = 0;
     protocol.totalValueLockedUSD = BIGDECIMAL_ZERO;
-    protocol.lendingType = LendingType.CDP;
     protocol.mintedTokens = [DAI_ADDRESS];
     protocol.marketIDList = [];
     protocol._par = BIGINT_ONE_RAY;
@@ -329,7 +203,6 @@ export function getOrCreateMarket(
     market.maximumLTV = BIGDECIMAL_ZERO;
     market.liquidationThreshold = BIGDECIMAL_ZERO;
     market.liquidationPenalty = BIGDECIMAL_ZERO;
-    market.rates = [BIGDECIMAL_ZERO.toString()];
     market.debtMultiplier = BIGDECIMAL_ZERO;
     market._mat = BIGINT_ONE_RAY;
 
@@ -352,22 +225,6 @@ export function getOrCreateIlk(ilk: Bytes, marketID: string = ZERO_ADDRESS): _Il
     _ilk.save();
   }
   return _ilk;
-}
-
-export function getOrCreateInterestRate(marketAddress: string, side: string, type: string): InterestRate {
-  let interestRateID = side + "-" + type + "-" + marketAddress;
-  let interestRate = InterestRate.load(interestRateID);
-  if (interestRate) {
-    return interestRate;
-  }
-
-  interestRate = new InterestRate(interestRateID);
-  interestRate.side = side;
-  interestRate.type = type;
-  interestRate.rate = BIGDECIMAL_ONE;
-  interestRate.save();
-
-  return interestRate;
 }
 
 export function getLiquidateEvent(LiquidateID: string): Liquidate | null {
@@ -455,26 +312,4 @@ export function getOwnerAddressFromProxy(proxy: string): string {
     owner = _proxy.ownerAddress;
   }
   return owner;
-}
-
-// this is needed to prevent snapshot rates from being pointers to the current rate
-export function getSnapshotRates(rates: string[], timeSuffix: string): string[] {
-  let snapshotRates: string[] = [];
-  for (let i = 0; i < rates.length; i++) {
-    let rate = InterestRate.load(rates[i]);
-    if (!rate) {
-      log.warning("[getSnapshotRates] rate {} not found, should not happen", [rates[i]]);
-      continue;
-    }
-
-    // create new snapshot rate
-    let snapshotRateId = rates[i].concat("-").concat(timeSuffix);
-    let snapshotRate = new InterestRate(snapshotRateId);
-    snapshotRate.side = rate.side;
-    snapshotRate.type = rate.type;
-    snapshotRate.rate = rate.rate;
-    snapshotRate.save();
-    snapshotRates.push(snapshotRateId);
-  }
-  return snapshotRates;
 }

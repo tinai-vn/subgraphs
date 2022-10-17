@@ -11,13 +11,9 @@ import {
   Token,
 } from "../../generated/schema";
 import {
-  getOrCreateMarketHourlySnapshot,
-  getOrCreateMarketDailySnapshot,
   getOrCreateFinancials,
   getOrCreateLendingProtocol,
-  getOrCreateUsageMetricsHourlySnapshot,
   getOrCreateUsageMetricsDailySnapshot,
-  getSnapshotRates,
 } from "./getters";
 import {
   BIGDECIMAL_ZERO,
@@ -32,7 +28,7 @@ import {
   RAD,
   ProtocolSideRevenueType,
 } from "./constants";
-import { createEventID } from "../utils/strings";
+import { createEventID, getDateXDaysAheadInUTC, getISODateStringInUTC, getISODateTimeStartOfDayStringInUTC } from "../utils/strings";
 import { bigIntToBDUseDecimals, bigIntChangeDecimals } from "../utils/numbers";
 import { Vat } from "../../generated/Vat/Vat";
 import { DAI } from "../../generated/Vat/DAI";
@@ -192,126 +188,6 @@ export function updateMarket(
     );
   }
   market.save();
-
-  snapshotMarket(
-    event,
-    market,
-    deltaCollateralUSD,
-    deltaDebtUSD,
-    liquidateUSD,
-    newTotalRevenueUSD,
-    newSupplySideRevenueUSD,
-  );
-}
-
-export function snapshotMarket(
-  event: ethereum.Event,
-  market: Market,
-  deltaCollateralUSD: BigDecimal = BIGDECIMAL_ZERO,
-  deltaDebtUSD: BigDecimal = BIGDECIMAL_ZERO,
-  liquidateUSD: BigDecimal = BIGDECIMAL_ZERO,
-  newTotalRevenueUSD: BigDecimal = BIGDECIMAL_ZERO,
-  newSupplySideRevenueUSD: BigDecimal = BIGDECIMAL_ZERO,
-): void {
-  let marketID = market.id;
-  let marketHourlySnapshot = getOrCreateMarketHourlySnapshot(event, marketID);
-  let marketDailySnapshot = getOrCreateMarketDailySnapshot(event, marketID);
-  if (marketHourlySnapshot == null || marketDailySnapshot == null) {
-    log.error("[snapshotMarket]Failed to get marketsnapshot for {}", [marketID]);
-    return;
-  }
-  let hours = (event.block.timestamp.toI32()/SECONDS_PER_HOUR).toString()
-  let hourlySnapshotRates = getSnapshotRates(market.rates, hours)
-
-  let days = (event.block.timestamp.toI32()/SECONDS_PER_DAY).toString()
-  let dailySnapshotRates = getSnapshotRates(market.rates, days)
-
-  marketHourlySnapshot.totalValueLockedUSD = market.totalValueLockedUSD;
-  marketHourlySnapshot.totalBorrowBalanceUSD = market.totalBorrowBalanceUSD;
-  marketHourlySnapshot.cumulativeSupplySideRevenueUSD = market.cumulativeSupplySideRevenueUSD;
-  marketHourlySnapshot.cumulativeProtocolSideRevenueUSD = market.cumulativeProtocolSideRevenueUSD;
-  marketHourlySnapshot.cumulativeTotalRevenueUSD = market.cumulativeTotalRevenueUSD;
-  marketHourlySnapshot.totalDepositBalanceUSD = market.totalDepositBalanceUSD;
-  marketHourlySnapshot.cumulativeDepositUSD = market.cumulativeDepositUSD;
-  marketHourlySnapshot.totalBorrowBalanceUSD = market.totalBorrowBalanceUSD;
-  marketHourlySnapshot.cumulativeBorrowUSD = market.cumulativeBorrowUSD;
-  marketHourlySnapshot.cumulativeLiquidateUSD = market.cumulativeLiquidateUSD;
-  marketHourlySnapshot.inputTokenBalance = market.inputTokenBalance;
-  marketHourlySnapshot.inputTokenPriceUSD = market.inputTokenPriceUSD;
-  marketHourlySnapshot.rates = hourlySnapshotRates;
-  //marketHourlySnapshot.outputTokenSupply = market.outputTokenSupply;
-  //marketHourlySnapshot.outputTokenPriceUSD = market.outputTokenPriceUSD;
-
-  marketHourlySnapshot.blockNumber = event.block.number;
-  marketHourlySnapshot.timestamp = event.block.timestamp;
-
-  marketDailySnapshot.totalValueLockedUSD = market.totalValueLockedUSD;
-  marketDailySnapshot.totalBorrowBalanceUSD = market.totalBorrowBalanceUSD;
-  marketDailySnapshot.cumulativeSupplySideRevenueUSD = market.cumulativeSupplySideRevenueUSD;
-  marketDailySnapshot.cumulativeProtocolSideRevenueUSD = market.cumulativeProtocolSideRevenueUSD;
-  marketDailySnapshot.cumulativeTotalRevenueUSD = market.cumulativeTotalRevenueUSD;
-  marketDailySnapshot.totalDepositBalanceUSD = market.totalDepositBalanceUSD;
-  marketDailySnapshot.cumulativeDepositUSD = market.cumulativeDepositUSD;
-  marketDailySnapshot.totalBorrowBalanceUSD = market.totalBorrowBalanceUSD;
-  marketDailySnapshot.cumulativeBorrowUSD = market.cumulativeBorrowUSD;
-  marketDailySnapshot.cumulativeLiquidateUSD = market.cumulativeLiquidateUSD;
-  marketDailySnapshot.inputTokenBalance = market.inputTokenBalance;
-  marketDailySnapshot.inputTokenPriceUSD = market.inputTokenPriceUSD;
-  marketDailySnapshot.rates = dailySnapshotRates;
-  //marketDailySnapshot.outputTokenSupply = market.outputTokenSupply;
-  //marketDailySnapshot.outputTokenPriceUSD = market.outputTokenPriceUSD;
-
-  marketDailySnapshot.blockNumber = event.block.number;
-  marketDailySnapshot.timestamp = event.block.timestamp;
-
-  if (deltaCollateralUSD.gt(BIGDECIMAL_ZERO)) {
-    marketHourlySnapshot.hourlyDepositUSD = marketHourlySnapshot.hourlyDepositUSD.plus(deltaCollateralUSD);
-    marketDailySnapshot.dailyDepositUSD = marketDailySnapshot.dailyDepositUSD.plus(deltaCollateralUSD);
-  } else if (deltaCollateralUSD.lt(BIGDECIMAL_ZERO)) {
-    // minus a negative number
-    marketHourlySnapshot.hourlyWithdrawUSD = marketHourlySnapshot.hourlyWithdrawUSD.minus(deltaCollateralUSD);
-    marketDailySnapshot.dailyWithdrawUSD = marketDailySnapshot.dailyWithdrawUSD.minus(deltaCollateralUSD);
-  }
-
-  if (deltaDebtUSD.gt(BIGDECIMAL_ZERO)) {
-    marketHourlySnapshot.hourlyBorrowUSD = marketHourlySnapshot.hourlyBorrowUSD.plus(deltaDebtUSD);
-    marketDailySnapshot.dailyBorrowUSD = marketDailySnapshot.dailyBorrowUSD.plus(deltaDebtUSD);
-  } else if (deltaDebtUSD.lt(BIGDECIMAL_ZERO)) {
-    // minus a negative number
-    marketHourlySnapshot.hourlyRepayUSD = marketHourlySnapshot.hourlyRepayUSD.minus(deltaDebtUSD);
-    marketDailySnapshot.dailyRepayUSD = marketDailySnapshot.dailyRepayUSD.minus(deltaDebtUSD);
-  }
-
-  if (liquidateUSD.gt(BIGDECIMAL_ZERO)) {
-    marketHourlySnapshot.hourlyLiquidateUSD = marketHourlySnapshot.hourlyLiquidateUSD.plus(liquidateUSD);
-    marketDailySnapshot.dailyLiquidateUSD = marketDailySnapshot.dailyLiquidateUSD.plus(liquidateUSD);
-  }
-
-  // update revenue
-  if (newTotalRevenueUSD.gt(BIGDECIMAL_ZERO)) {
-    marketHourlySnapshot.hourlyTotalRevenueUSD = marketHourlySnapshot.hourlyTotalRevenueUSD.plus(newTotalRevenueUSD);
-    marketDailySnapshot.dailyTotalRevenueUSD = marketDailySnapshot.dailyTotalRevenueUSD.plus(newTotalRevenueUSD);
-  }
-
-  if (newSupplySideRevenueUSD.gt(BIGDECIMAL_ZERO)) {
-    marketHourlySnapshot.hourlySupplySideRevenueUSD = marketHourlySnapshot.hourlySupplySideRevenueUSD.plus(
-      newSupplySideRevenueUSD,
-    );
-    marketDailySnapshot.dailySupplySideRevenueUSD = marketDailySnapshot.dailySupplySideRevenueUSD.plus(
-      newSupplySideRevenueUSD,
-    );
-  }
-
-  if (newTotalRevenueUSD.gt(BIGDECIMAL_ZERO) || newSupplySideRevenueUSD.gt(BIGDECIMAL_ZERO)) {
-    marketHourlySnapshot.hourlyProtocolSideRevenueUSD = marketHourlySnapshot.hourlyTotalRevenueUSD.minus(
-      marketHourlySnapshot.hourlySupplySideRevenueUSD,
-    );
-    marketDailySnapshot.dailyProtocolSideRevenueUSD = marketDailySnapshot.dailyTotalRevenueUSD.minus(
-      marketDailySnapshot.dailySupplySideRevenueUSD,
-    );
-  }
-  marketHourlySnapshot.save();
-  marketDailySnapshot.save();
 }
 
 export function updateFinancialsSnapshot(
@@ -404,7 +280,6 @@ export function updateUsageMetrics(
   liquidateUSD: BigDecimal = BIGDECIMAL_ZERO,
 ): void {
   let protocol = getOrCreateLendingProtocol();
-  let usageHourlySnapshot = getOrCreateUsageMetricsHourlySnapshot(event);
   let usageDailySnapshot = getOrCreateUsageMetricsDailySnapshot(event);
 
   // userU, userV, userW may be the same, they may not
@@ -416,67 +291,56 @@ export function updateUsageMetrics(
       account.save();
 
       protocol.cumulativeUniqueUsers += 1;
-      usageHourlySnapshot.cumulativeUniqueUsers += 1;
       usageDailySnapshot.cumulativeUniqueUsers += 1;
     }
 
-    let hours: i64 = event.block.timestamp.toI64() / SECONDS_PER_HOUR;
-    let hourlyActiveAcctountID = "hourly-"
-      .concat(accountID)
-      .concat("-")
-      .concat(hours.toString());
-    let hourlyActiveAccount = ActiveAccount.load(hourlyActiveAcctountID);
-    if (hourlyActiveAccount == null) {
-      hourlyActiveAccount = new ActiveAccount(hourlyActiveAcctountID);
-      hourlyActiveAccount.save();
+    const timestamp = event.block.timestamp.toI64();
+    const timestampInMilliseconds = timestamp * 1000;
+    const days: i64 = timestamp / SECONDS_PER_DAY;
 
-      usageHourlySnapshot.hourlyActiveUsers += 1;
-    }
 
-    let days: i64 = event.block.timestamp.toI64() / SECONDS_PER_DAY;
-    let dailyActiveAcctountID = "daily-"
+    const date = new Date(timestampInMilliseconds);
+    const next_date = getDateXDaysAheadInUTC(1, date);
+    const datetime_start = getISODateTimeStartOfDayStringInUTC(date);
+    const datetime_end = getISODateTimeStartOfDayStringInUTC(next_date);
+
+    let dailyActiveAccountId = "daily-"
       .concat(accountID)
       .concat("-")
       .concat(days.toString());
-    let dailyActiveAccount = ActiveAccount.load(dailyActiveAcctountID);
+    let dailyActiveAccount = ActiveAccount.load(dailyActiveAccountId);
     if (dailyActiveAccount == null) {
-      dailyActiveAccount = new ActiveAccount(dailyActiveAcctountID);
+      dailyActiveAccount = new ActiveAccount(dailyActiveAccountId);
+      dailyActiveAccount.account_id = accountID;
+      dailyActiveAccount.granularity = "1_day";
+      dailyActiveAccount.datetime_start = datetime_start;
+      dailyActiveAccount.datetime_end = datetime_end;
       dailyActiveAccount.save();
-
       usageDailySnapshot.dailyActiveUsers += 1;
     }
   }
 
   if (deltaCollateralUSD.gt(BIGDECIMAL_ZERO)) {
-    usageHourlySnapshot.hourlyDepositCount += 1;
     usageDailySnapshot.dailyDepositCount += 1;
   } else if (deltaCollateralUSD.lt(BIGDECIMAL_ZERO)) {
-    usageHourlySnapshot.hourlyWithdrawCount += 1;
     usageDailySnapshot.dailyWithdrawCount += 1;
   }
 
   if (deltaDebtUSD.gt(BIGDECIMAL_ZERO)) {
-    usageHourlySnapshot.hourlyBorrowCount += 1;
     usageDailySnapshot.dailyBorrowCount += 1;
   } else if (deltaDebtUSD.lt(BIGDECIMAL_ZERO)) {
-    usageHourlySnapshot.hourlyRepayCount += 1;
     usageDailySnapshot.dailyRepayCount += 1;
   }
 
   if (liquidateUSD.gt(BIGDECIMAL_ZERO)) {
-    usageHourlySnapshot.hourlyLiquidateCount += 1;
     usageDailySnapshot.dailyLiquidateCount += 1;
   }
 
-  usageHourlySnapshot.hourlyTransactionCount += 1;
   usageDailySnapshot.dailyTransactionCount += 1;
-  usageHourlySnapshot.blockNumber = event.block.number;
   usageDailySnapshot.blockNumber = event.block.number;
-  usageHourlySnapshot.timestamp = event.block.timestamp;
   usageDailySnapshot.timestamp = event.block.timestamp;
 
   protocol.save();
-  usageHourlySnapshot.save();
   usageDailySnapshot.save();
 }
 

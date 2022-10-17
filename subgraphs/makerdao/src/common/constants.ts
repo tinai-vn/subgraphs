@@ -40,14 +40,6 @@ export namespace Network {
   export const XDAI = "XDAI"; // aka Gnosis Chain
 }
 
-export namespace ProtocolType {
-  export const EXCHANGE = "EXCHANGE";
-  export const LENDING = "LENDING";
-  export const YIELD = "YIELD";
-  export const BRIDGE = "BRIDGE";
-  export const GENERIC = "GENERIC";
-}
-
 export namespace VaultFeeType {
   export const MANAGEMENT_FEE = "MANAGEMENT_FEE";
   export const PERFORMANCE_FEE = "PERFORMANCE_FEE";
@@ -60,32 +52,6 @@ export namespace LiquidityPoolFeeType {
   export const TIERED_TRADING_FEE = "TIERED_TRADING_FEE";
   export const DYNAMIC_TRADING_FEE = "DYNAMIC_TRADING_FEE";
   export const PROTOCOL_FEE = "PROTOCOL_FEE";
-}
-
-export namespace RewardTokenType {
-  export const DEPOSIT = "DEPOSIT";
-  export const BORROW = "BORROW";
-}
-
-export namespace LendingType {
-  export const CDP = "CDP";
-  export const POOLED = "POOLED";
-}
-
-export namespace RiskType {
-  export const GLOBAL = "GLOBAL";
-  export const ISOLATED = "ISOLATED";
-}
-
-export namespace InterestRateType {
-  export const STABLE = "STABLE";
-  export const VARIABLE = "VARIABLE";
-  export const FIXED = "FIXED";
-}
-
-export namespace InterestRateSide {
-  export const LENDER = "LENDER";
-  export const BORROW = "BORROWER";
 }
 
 // They are defined as u32 for use with switch/case

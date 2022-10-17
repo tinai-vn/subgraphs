@@ -33,7 +33,6 @@ import {
 } from "./utils/numbers";
 import {
   getOrCreateChi,
-  getOrCreateInterestRate,
   getOwnerAddressFromCdp,
   getOwnerAddressFromProxy,
 } from "./common/getters";
@@ -55,8 +54,6 @@ import {
   BIGDECIMAL_ZERO,
   BIGDECIMAL_ONE,
   BIGDECIMAL_ONE_HUNDRED,
-  InterestRateSide,
-  InterestRateType,
   SECONDS_PER_YEAR_BIGDECIMAL,
   VOW_ADDRESS,
   DAI_ADDRESS,
@@ -78,7 +75,6 @@ import {
   updatePriceForMarket,
   updateRevenue,
   updateMarket,
-  snapshotMarket,
 } from "./common/helpers";
 import {
   getOrCreateMarket,
@@ -1009,14 +1005,7 @@ export function handleJugFileDuty(event: JugNoteEvent): void {
       rateAnnualized.toString(),
     ]);
 
-    let interestRateID = InterestRateSide.BORROW + "-" + InterestRateType.STABLE + "-" + market.id;
-    let interestRate = getOrCreateInterestRate(market.id, InterestRateSide.BORROW, InterestRateType.STABLE);
-    interestRate.rate = rateAnnualized;
-    interestRate.save();
-
-    market.rates = [interestRateID];
     market.save();
-    snapshotMarket(event, market);
   }
 }
 
@@ -1068,14 +1057,7 @@ export function handlePotFileDsr(event: PotNoteEvent): void {
       rateAnnualized = bigDecimalExponential(rate, SECONDS_PER_YEAR_BIGDECIMAL).times(BIGDECIMAL_ONE_HUNDRED);
     }
 
-    let interestRateID = `${InterestRateSide.LENDER}-${InterestRateType.STABLE}-${event.address.toHexString()}`;
-    let interestRate = getOrCreateInterestRate(market.id, InterestRateSide.LENDER, InterestRateType.STABLE);
-    interestRate.rate = rateAnnualized;
-    interestRate.save();
-
-    market.rates = [interestRateID];
     market.save();
-    snapshotMarket(event, market);
 
     log.info("[handlePotFileDsr] dsr={}, rate={}, rateAnnualized={}", [
       dsr.toString(),
